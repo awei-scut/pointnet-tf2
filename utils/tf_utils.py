@@ -49,9 +49,11 @@ class FC(keras.layers.Layer):
     def __init__(self,
                  outdim,
                  name,
+                 activation=True,
                  bn=True):
         super(FC).__init__(name=name)
         self.check = bn
+        self.activation = activation
         self.fc = keras.layers.Dense(outdim)
         self.bn = keras.layers.BatchNormalization()
         self.activation = keras.layers.Activation('relu')
@@ -60,6 +62,7 @@ class FC(keras.layers.Layer):
         out = self.fc(inputs)
         if self.check:
             out = self.bn(out)
-        out = self.activation(out)
+        if self.activation:
+            out = self.activation(out)
         return out
 
