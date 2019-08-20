@@ -126,12 +126,13 @@ def train_cls2():
         all_label = np.concatenate((all_label, pc_label), axis=0)
     ##
     val_data, val_label = data_provider.load_h5(TEST_FILES[0])
+    val_data = val_data[:, 0:NUM_POINT, :]
     val_dataset = tf.data.Dataset.from_tensor_slices((val_data, val_label))
-    val_dataset = val_dataset.map(preprocessing)
+    val_dataset = val_dataset.map(preprocessing).batch(32)
 
     dataset = tf.data.Dataset.from_tensor_slices((all_data, all_label))
     dataset = dataset.map(preprocessing).shuffle(10000).batch(32).repeat()
-    op = tf.keras.optimizers.Adam(0.0001)
+    # op = tf.keras.optimizers.Adam(0.0001)
     # for (x, y) in iter(dataset):
     #     with tf.GradientTape() as tape:
     #         out = model(x)
@@ -146,7 +147,7 @@ def train_cls2():
     #     print('loss: %4f  acc: %.2f ' %( loss, int(correct) / y.shape[0]))
     model.compile(optimizer=tf.keras.optimizers.Adam(0.001), loss=tf.keras.losses.categorical_crossentropy,\
                   metrics=['accuracy'])
-    model.fit(dataset, steps_per_epoch=150, epochs=50, validation_data=val_dataset, validation_steps=200)
+    model.fit(dataset, steps_per_epoch=100, epochs=50, validation_data=val_dataset, validation_freq=1)
     model.save_weights('./checkpoints/net.ckpt')
 
 
@@ -163,7 +164,6 @@ def get_loss(pred, label, end_points, reg_weights=0.001):
     mat_diff_loss = tf.nn.l2_loss(mat_diff)
     tf.summary.scalar('mat_loss', mat_diff_loss)
     return cls_loss + mat_diff_loss * reg_weights
-
 
 
 if __name__ == '__main__':
