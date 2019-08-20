@@ -9,61 +9,56 @@ from utils import tf_utils
 class ClsModel(keras.Model):
 
     def __init__(self, num_points):
-        super(ClsModel).__init__(name='clsModel')
-        self.input_transform = Input_Transform_Net(num_points)
-        self.feature_transform = Feature_Transform_Net(num_points)
-        self.conv1 = tf_utils.Conv2D(64, [1, 3], padding='valid', strides=(1, 1), bn=True, name='conv1')
-        self.conv2 = tf_utils.Conv2D(64, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv1')
+        super(ClsModel, self).__init__()
+        self.num_points = num_points
+        self.input_transform = Input_Transform_Net(self.num_points)
+        self.feature_transform = Feature_Transform_Net(self.num_points, K=64)
+        self.conv1 = tf_utils.MyConv(64, [1, 3], padding='valid', strides=(1, 1), bn=True, name='conv1')
+        # self.conv1 = keras.layers.Conv2D(64, [1, 3], padding='valid', strides=(1, 1))
+        self.conv2 = tf_utils.MyConv(64, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv2')
 
-        self.conv3 = tf_utils.Conv2D(64, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv1')
-        self.conv4 = tf_utils.Conv2D(128, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv1')
-        self.conv5 = tf_utils.Conv2D(1024, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv1')
+        self.conv3 = tf_utils.MyConv(64, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv3')
+        self.conv4 = tf_utils.MyConv(128, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv4')
+        self.conv5 = tf_utils.MyConv(1024, [1, 1], padding='valid', strides=(1, 1), bn=True, name='conv5')
 
-        self.maxpooling = keras.layers.MaxPool2D([num_points, 1], padding='valid')
-
+        self.maxpooling = keras.layers.MaxPool2D([self.num_points, 1], padding='valid')
+        self.flatten = keras.layers.Flatten()
         self.fc1 = tf_utils.FC(512, name='fc1')
-        self.drop1 = keras.layers.Dropout(0.7)
+        self.drop1 = keras.layers.Dropout(0.5)
         self.fc2 = tf_utils.FC(256, name='fc2')
-        self.drop2 = keras.layers.Dropout(0.7)
-        self.fc3 = tf_utils.FC(40, name='fc3', activation=False)
-        self.drop4 = keras.layers.Dropout(0.7)
+        self.drop2 = keras.layers.Dropout(0.5)
+        self.fc3 = tf_utils.FC(40, name='fc3', activation=False, bn=False)
 
     def call(self, inputs):
-        batch_size = inputs.shape[0]
-        num_points = inputs.shape[1]
         # input_transform
         end_points = {}
         transform = self.input_transform(inputs)
-        after_transform = tf.matmul(inputs, transform)
-        input_image = tf.expand_dims(after_transform, -1)
-        out = self.conv1(input_image)
-        out = self.conv2(input_image)
+        inputs = tf.matmul(inputs, transform)
+        inputs= tf.expand_dims(inputs, -1)
+        out = self.conv1(inputs)
+        out = self.conv2(out)
         # feature_transform
         transform2 = self.feature_transform(out)
-        end_points['transform'] = transform
+        end_points['transform'] = transform2
         out_transform = tf.matmul(tf.squeeze(out, axis=2), transform2)
-        out_transform = tf.expand_dims(out_transform, [2])
+        out_transform = tf.expand_dims(out_transform, axis=2)
+
+        out_transform = self.conv3(out_transform)
+        out_transform = self.conv4(out_transform)
+        out_transform = self.conv5(out_transform)
 
         out_transform = self.maxpooling(out_transform)
-        out_transform = tf.reshape(out_transform, [batch_size, -1])
+        out_transform = self.flatten(out_transform)
         out_transform = self.fc1(out_transform)
         out_transform = self.drop1(out_transform)
         out_transform = self.fc2(out_transform)
         out_transform = self.drop2(out_transform)
         out_transform = self.fc3(out_transform)
-        out_transform = self.drop3(out_transform)
-        return out_transform, end_points
 
-def get_loss(pred, label, end_points, reg_weights=0.001):
-    loss = tf.losses.sparse_categorical_crossentropy(y_pred=pred, y_true=label)
-    cls_loss = tf.reduce_mean(loss)
+        return tf.nn.softmax(out_transform)
 
-    tf.summary.scalar('cls_loss', cls_loss)
-    ## transform
-    transform = end_points['transform']
-    K = transform.shape[1]
-    mat_diff = tf.matmul(transform, tf.transpose(transform, perm=[0, 2, 1]))
-    mat_diff -= tf.constant(np.eye(K), dtype=tf.float32)
-    mat_diff_loss = tf.nn.l2_loss(mat_diff)
-    tf.summary.scalar('mat_loss', mat_diff_loss)
-    return cls_loss + mat_diff_loss * reg_weights
+
+if __name__ == '__main__':
+
+    model = ClsModel(1024)
+    model.build(input_shape=(None, 1024, 3))

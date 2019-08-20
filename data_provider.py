@@ -29,7 +29,7 @@ def shuffle_data(data, labels):
     """
     idx = np.arange(len(labels))
     np.random.shuffle(idx)
-    return data[idx, ...], labels[idx], idx
+    return data[idx, ...], labels[idx,:], idx
 
 
 def rotate_point_cloud(batch_data):
@@ -97,9 +97,6 @@ def load_h5(h5_filename):
     label = f['label'][:]
     return (data, label)
 
-
-def loadDataFile(filename):
-    return load_h5(filename)
 
 
 def load_h5_data_label_seg(h5_filename):
