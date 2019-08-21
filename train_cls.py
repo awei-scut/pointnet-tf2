@@ -6,7 +6,7 @@ import sys
 from models import pointnet_cls
 import data_provider
 
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '10'
 
 parser = argparse.ArgumentParser()
 # parser.add_argument('--gpu', type=int, default=0, help='GPU to use [default: GPU 0]')
@@ -110,8 +110,7 @@ def preprocessing(x, y):
 
 def train_cls2():
 
-    model = pointnet_cls.ClsModel(NUM_POINT)
-    model.build(input_shape=(None, 1024, 3))
+    
     # model.summary()
     ## train_data
     pc_data, pc_label = data_provider.load_h5(TRAIN_FILES[0])
@@ -145,10 +144,19 @@ def train_cls2():
     #
     #     correct = tf.reduce_sum(tf.cast(tf.equal(pred, y_label),dtype=tf.int64))
     #     print('loss: %4f  acc: %.2f ' %( loss, int(correct) / y.shape[0]))
+    # mirrored_strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"])
+    checkpoint_prefix = './checkpoints/net.ckpt'
+    callbacks = [
+        tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_prefix,
+                                    save_weights_only=True)
+    ]
+    # with mirrored_strategy.scope():
+    model = pointnet_cls.ClsModel(NUM_POINT)
     model.compile(optimizer=tf.keras.optimizers.Adam(0.001), loss=tf.keras.losses.categorical_crossentropy,\
-                  metrics=['accuracy'])
-    model.fit(dataset, steps_per_epoch=100, epochs=50, validation_data=val_dataset, validation_freq=1)
-    model.save_weights('./checkpoints/net.ckpt')
+                metrics=['accuracy'])
+    model.load_weights(checkpoint_prefix)
+    model.fit(dataset, steps_per_epoch=150, epochs=250, validation_data=val_dataset, validation_freq=5, callbacks=callbacks)
+
 
 
 def get_loss(pred, label, end_points, reg_weights=0.001):
@@ -167,4 +175,10 @@ def get_loss(pred, label, end_points, reg_weights=0.001):
 
 
 if __name__ == '__main__':
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        tf.config.experimental.set_virtual_device_configuration(gpus[0],\
+        [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=5000)])
+     
+
     train_cls2()
