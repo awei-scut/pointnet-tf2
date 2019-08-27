@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData">
+    <serverData>
+      <paths name="lab-wei.zewei@222.201.134.197:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lab-wei.zewei/workspace" local="$PROJECT_DIR$" />
+            <mapping />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>
